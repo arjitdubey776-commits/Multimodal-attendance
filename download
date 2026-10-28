@@ -1,0 +1,10 @@
+__pycache__/
+.venv/
+.env
+data/faces/
+data/*.yml
+data/labels.json
+data/students.json
+data/attendance.csv
+data/session_events.csv
+data/uploaded_video

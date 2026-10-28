@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassPulse — Attendance & Engagement</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar"><div class="brand"><div class="brand-icon">✦</div><div><b>ClassPulse</b><small>Multimodal Attendance & Engagement Agent</small></div></div><span class="offline"><i></i> LOCAL / OFFLINE</span></header>
+<main class="wrap">
+<section class="hero"><div><p class="eyebrow">CLASSROOM INTELLIGENCE</p><h1>Attendance that sees the <em>bigger picture.</em></h1><p class="muted">Track registered faces, review classroom activity signals, and generate practical teaching prompts — locally on your computer.</p></div><div class="hero-mark">◎</div></section>
+{% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-list">{% for category,message in messages %}<div class="flash {{category}}">{{message}}</div>{% endfor %}</div>{% endif %}{% endwith %}
+<section class="stats">
+<div class="stat"><span>REGISTERED STUDENTS</span><strong>{{ total_students }}</strong><small>In local roster</small></div>
+<div class="stat"><span>ATTENDANCE MARKED</span><strong>{{ attendance_count }}</strong><small>Recognized this session</small></div>
+<div class="stat"><span>AVG. FACES DETECTED</span><strong>{{ avg_faces }}</strong><small>Sampled session frames</small></div>
+<div class="stat"><span>FACE MODEL</span><strong class="status-text">{{ 'Ready' if model_ready else 'Not trained' }}</strong><small>LBPH local recognition</small></div>
+</section>
+<div class="layout">
+<section class="panel wide">
+<div class="panel-head"><div><p class="eyebrow">LIVE SESSION</p><h2>Classroom monitor</h2></div><span class="pill {{'live' if running else ''}}">{{ 'SESSION LIVE' if running else 'SESSION STOPPED' }}</span></div>
+<div class="video-box">{% if running %}<img src="{{ url_for('video_feed') }}" alt="Live webcam feed">{% else %}<div class="video-placeholder"><div class="camera-icon">◉</div><b>Your camera feed appears here</b><span>Start a session to enable live detection.</span></div>{% endif %}</div>
+<div class="actions">{% if not running %}<form method="post" action="{{ url_for('start_session') }}"><button class="btn primary">▶ Start session</button></form>{% else %}<form method="post" action="{{ url_for('stop_session') }}"><button class="btn danger">■ Stop session</button></form>{% endif %}{% if session_id %}<a class="btn secondary" href="{{ url_for('export_session') }}">↓ Export attendance CSV</a>{% endif %}</div>
+<div class="metric-strip"><div><span>Current detected faces</span><b id="faces">—</b></div><div><span>Image motion</span><b id="motion">—</b></div><div><span>Face area ratio</span><b id="ratio">—</b></div></div>
+</section>
+<section class="panel">
+<div class="panel-head"><div><p class="eyebrow">AI AGENT</p><h2>Teaching suggestions</h2></div><span class="spark">✦</span></div>
+<p class="muted small">Rule-based suggestions from observed session signals; not a measure of a student's internal attention.</p>
+<ul class="suggestions">{% for suggestion in suggestions %}<li><span>✧</span>{{ suggestion }}</li>{% endfor %}</ul>
+<div class="notice"><b>Privacy by design</b><p>Video is processed locally. Get consent, restrict access, and provide a non-camera alternative. Do not use this prototype for grading or discipline.</p></div>
+</section>
+<section class="panel">
+<div class="panel-head"><div><p class="eyebrow">ROSTER</p><h2>Student directory</h2></div><span class="count">{{ roster|length }} students</span></div>
+<form class="add-form" method="post" action="{{ url_for('add_student') }}"><input name="student_id" placeholder="Student ID (e.g. ECE01)" required><input name="name" placeholder="Full name" required><button class="btn primary">Add student</button></form>
+<div class="student-list">{% for student in roster %}<div class="student-row"><div class="avatar">{{ student.name[:1]|upper }}</div><div class="student-info"><b>{{ student.name }}</b><small>ID: {{ student.id }} · {{ ( (namespace(n=0)) ).n }}Local face samples stored on this computer</small></div><div class="student-actions"><form method="post" action="{{ url_for('capture_samples',sid=student.id) }}" onsubmit="return confirm('This opens the webcam to capture face samples for {{ student.name }}. Ensure you have consent. Continue?')"><button class="mini-btn">Capture face</button></form><form method="post" action="{{ url_for('delete_student',sid=student.id) }}" onsubmit="return confirm('Delete this student and their face samples?')"><button class="mini-btn remove">×</button></form></div></div>{% else %}<p class="empty">No students yet. Add a student, capture face samples, then train the model.</p>{% endfor %}</div>
+<form method="post" action="{{ url_for('train_route') }}" class="train-form"><button class="btn secondary full">⚙ Train / refresh face recognition model</button></form>
+</section>
+<section class="panel">
+<div class="panel-head"><div><p class="eyebrow">AUDIO SIGNALS</p><h2>Analyze classroom audio</h2></div><span class="spark">♫</span></div>
+<p class="muted small">Upload a PCM WAV recording to calculate signal energy and coarse activity over time. Audio is processed locally and deleted after analysis.</p>
+<form method="post" enctype="multipart/form-data" action="{{ url_for('analyze_audio') }}" class="upload-form"><input type="file" name="audio" accept="audio/wav,.wav" required><button class="btn primary">Analyze audio</button></form>
+<div class="notice"><b>Audio privacy</b><p>This feature measures sound energy only; it does not transcribe speech, identify speakers, or determine engagement.</p></div>
+</section>
+<section class="panel">
+<div class="panel-head"><div><p class="eyebrow">VIDEO REVIEW</p><h2>Analyze a recording</h2></div><span class="spark">↗</span></div>
+<p class="muted small">Upload a classroom video for a lightweight sample-based face-count and motion summary. The uploaded video is deleted after analysis.</p>
+<form method="post" enctype="multipart/form-data" action="{{ url_for('analyze_video') }}" class="upload-form"><input type="file" name="video" accept="video/*" required><button class="btn primary">Analyze video</button></form>
+<div class="notice"><b>What is measured?</b><p>Face detections, image motion, and face visibility. These are imperfect proxies and cannot reliably determine attention, emotion, or learning.</p></div>
+</section>
+<section class="panel wide">
+<div class="panel-head"><div><p class="eyebrow">SESSION LOG</p><h2>Recognized attendance</h2></div><span class="count">{{ attendance|length }} marked</span></div>
+<div class="table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Timestamp</th><th>Method</th></tr></thead><tbody>{% for row in attendance %}<tr><td>{{ row.student_name }}</td><td>{{ row.student_id }}</td><td>{{ row.timestamp }}</td><td><span class="tag">{{ row.method }}</span></td></tr>{% else %}<tr><td colspan="4" class="empty">No recognized students yet. Register face samples and train the model first.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+</div>
+<footer>ClassPulse demo · Python + Flask + OpenCV · Local data stays in the <code>data/</code> folder</footer>
+</main>
+<script>
+async function updateMetrics(){
+ try { const r=await fetch('/api/metrics'); const d=await r.json();
+ document.getElementById('faces').textContent=d.faces ?? '—';
+ document.getElementById('motion').textContent=(Number(d.motion||0)).toFixed(3);
+ document.getElementById('ratio').textContent=(Number(d.face_ratio||0)*100).toFixed(1)+'%';
+ } catch(e) {}
+}
+setInterval(updateMetrics,1500); updateMetrics();
+</script>
+</body></html>
